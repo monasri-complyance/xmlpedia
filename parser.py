@@ -1,21 +1,17 @@
 from lxml import etree
 
-
 def get_tag(tag):
     if "}" in tag:
         return tag.split("}", 1)[1]
     return tag
-
 
 def get_namespace(tag):
     if "}" not in tag:
         return ""
     return tag.split("}", 1)[0][1:]
 
-
 def get_value(element):
     return (element.text or "").strip()
-
 
 def get_attributes(element):
     return {
@@ -23,11 +19,10 @@ def get_attributes(element):
         for key, value in element.attrib.items()
     }
 
-
 def build_tree(element):
-
     node = {
         "tag": get_tag(element.tag),
+        "full_tag": element.tag,
         "namespace": get_namespace(element.tag),
         "value": get_value(element),
         "attributes": get_attributes(element),
@@ -42,9 +37,7 @@ def build_tree(element):
 
     return node
 
-
 def parse_xml(data):
-
     root = etree.fromstring(data)
 
     return {

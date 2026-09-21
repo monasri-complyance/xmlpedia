@@ -28,11 +28,9 @@
         .panel {
             border: 1px solid #ddd;
             padding: 15px;
-            height: 600px;
+            height: 800px;
             overflow: auto;
         }
-
-        /* DIRECTORY TREE */
 
         .item {
             padding: 4px 5px;
@@ -59,8 +57,6 @@
             border-top: 1px solid #ccc;
         }
 
-        /* XML */
-
         .xml-line {
             font-family: monospace;
             white-space: pre-wrap;
@@ -71,6 +67,7 @@
 
         .highlight {
             background: yellow;
+            color: black;
         }
 
     </style>
@@ -81,7 +78,6 @@
 <body>
 
     <h1>XMLpedia</h1>
-
 
     <input
         type="file"
@@ -97,7 +93,13 @@
     <div class="layout">
 
 
-        <!-- INVOICE DATA -->
+        <div class="panel">
+
+            <h2>XML</h2>
+
+            <div id="xml"></div>
+
+        </div>
 
         <div class="panel">
 
@@ -108,18 +110,6 @@
             </div>
 
         </div>
-
-
-        <!-- XML -->
-
-        <div class="panel">
-
-            <h2>XML</h2>
-
-            <div id="xml"></div>
-
-        </div>
-
 
     </div>
 
@@ -136,6 +126,7 @@
                 alert("Select an XML file");
 
                 return;
+
             }
 
             const formData =
@@ -146,21 +137,44 @@
                 file
             );
 
-            const response =
-                await fetch(
-                    "http://127.0.0.1:8000/parse",
-                    {
-                        method: "POST",
-                        body: formData
-                    }
+            try {
+
+                const response =
+                    await fetch(
+                        "http://127.0.0.1:8000/parse",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Server error: " +
+                        response.status
+                    );
+
+                }
+
+                const data =
+                    await response.json();
+
+                showXML(data.xml);
+
+                showTree(data.tree);
+
+            } catch (error) {
+
+                console.error(error);
+
+                alert(
+                    "Failed to parse XML\n\n" +
+                    error.message
                 );
 
-            const data =
-                await response.json();
+            }
 
-            showXML(data.xml);
-
-            showTree(data.tree);
         }
 
 
@@ -174,20 +188,29 @@
             const lines =
                 xml.split("\n");
 
-            lines.forEach(line => {
+            lines.forEach(
+                (line, index) => {
 
-                const div =
-                    document.createElement("div");
+                    const div =
+                        document.createElement("div");
 
-                div.className =
-                    "xml-line";
+                    div.className =
+                        "xml-line";
 
-                div.textContent =
-                    line;
+                    div.dataset.line =
+                        index + 1;
 
-                box.appendChild(div);
+                    div.dataset.originalText =
+                        line;
 
-            });
+                    div.textContent =
+                        line;
+
+                    box.appendChild(div);
+
+                }
+            );
+
         }
 
 
@@ -202,10 +225,14 @@
                 node,
                 tree
             );
+
         }
 
 
-        function addNode(node, parent) {
+        function addNode(
+            node,
+            parent
+        ) {
 
             const item =
                 document.createElement("div");
@@ -214,8 +241,10 @@
                 "item";
 
             item.innerHTML = `
-                <b>${node.tag}</b>
-                ${node.value || ""}
+                <b>${escapeHTML(node.tag)}</b>
+                ${node.value
+                    ? " " + escapeHTML(node.value)
+                    : ""}
             `;
 
             item.onclick =
@@ -227,11 +256,13 @@
 
                 };
 
-
             parent.appendChild(item);
 
 
-            if (node.children.length > 0) {
+            if (
+                node.children &&
+                node.children.length > 0
+            ) {
 
                 const children =
                     document.createElement("div");
@@ -239,10 +270,14 @@
                 children.className =
                     "children";
 
-                item.appendChild(children);
+                item.appendChild(
+                    children
+                );
 
-
-                for (const child of node.children) {
+                for (
+                    const child
+                    of node.children
+                ) {
 
                     addNode(
                         child,
@@ -256,6 +291,42 @@
         }
 
 
+        function escapeHTML(value) {
+
+            if (
+                value === null ||
+                value === undefined
+            ) {
+
+                return "";
+
+            }
+
+            return String(value)
+                .replace(
+                    /&/g,
+                    "&amp;"
+                )
+                .replace(
+                    /</g,
+                    "&lt;"
+                )
+                .replace(
+                    />/g,
+                    "&gt;"
+                )
+                .replace(
+                    /"/g,
+                    "&quot;"
+                )
+                .replace(
+                    /'/g,
+                    "&#039;"
+                );
+
+        }
+
+
         function goToXML(node) {
 
             const lines =
@@ -264,13 +335,16 @@
                 );
 
 
-            lines.forEach(line => {
+            lines.forEach(
+                line => {
 
-                line.classList.remove(
-                    "highlight"
-                );
+                    line.innerHTML = "";
 
-            });
+                    line.textContent =
+                        line.dataset.originalText;
+
+                }
+            );
 
 
             const line =
@@ -289,18 +363,179 @@
             }
 
 
-            line.classList.add(
-                "highlight"
+            const originalText =
+                line.dataset.originalText;
+
+
+            const tag =
+                node.tag;
+
+
+            const escapedTag =
+                tag.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                );
+
+
+            const elementRegex =
+                new RegExp(
+                    `<(?:[a-zA-Z0-9_-]+:)?${escapedTag}\\b[^>]*>[\\s\\S]*?<\\/(?:[a-zA-Z0-9_-]+:)?${escapedTag}>`,
+                    "i"
+                );
+
+
+            const elementMatch =
+                originalText.match(
+                    elementRegex
+                );
+
+
+            if (elementMatch) {
+
+                highlightMatch(
+                    line,
+                    originalText,
+                    elementMatch.index,
+                    elementMatch[0].length
+                );
+
+                line.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
+
+                return;
+
+            }
+
+
+            const selfClosingRegex =
+                new RegExp(
+                    `<(?:[a-zA-Z0-9_-]+:)?${escapedTag}\\b[^>]*/>`,
+                    "i"
+                );
+
+
+            const selfClosingMatch =
+                originalText.match(
+                    selfClosingRegex
+                );
+
+
+            if (selfClosingMatch) {
+
+                highlightMatch(
+                    line,
+                    originalText,
+                    selfClosingMatch.index,
+                    selfClosingMatch[0].length
+                );
+
+                line.scrollIntoView({
+                    behavior: "smooth",
+                });
+
+                return;
+
+            }
+
+
+            const openingTagRegex =
+                new RegExp(
+                    `<(?:[a-zA-Z0-9_-]+:)?${escapedTag}\\b[^>]*>`,
+                    "i"
+                );
+
+
+            const openingMatch =
+                originalText.match(
+                    openingTagRegex
+                );
+
+
+            if (openingMatch) {
+
+                highlightMatch(
+                    line,
+                    originalText,
+                    openingMatch.index,
+                    openingMatch[0].length
+                );
+
+                line.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
+
+                return;
+
+            }
+
+
+            console.log(
+                "Element not found:",
+                node.tag
+            );
+
+        }
+
+
+        function highlightMatch(
+            line,
+            text,
+            start,
+            length
+        ) {
+
+            const before =
+                text.substring(
+                    0,
+                    start
+                );
+
+            const selected =
+                text.substring(
+                    start,
+                    start + length
+                );
+
+            const after =
+                text.substring(
+                    start + length
+                );
+
+
+            line.innerHTML = "";
+
+
+            line.appendChild(
+                document.createTextNode(
+                    before
+                )
             );
 
 
-            line.scrollIntoView({
+            const highlight =
+                document.createElement("span");
 
-                behavior: "smooth",
+            highlight.className =
+                "highlight";
 
-                block: "center"
+            highlight.textContent =
+                selected;
 
-            });
+
+            line.appendChild(
+                highlight
+            );
+
+
+            line.appendChild(
+                document.createTextNode(
+                    after
+                )
+            );
 
         }
 
