@@ -20,3 +20,5 @@ async def parse(file: UploadFile = File(...)):
     data = await file.read()
 
     return parse_xml(data)
+
+    

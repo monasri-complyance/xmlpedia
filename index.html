@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>XMLpedia</title>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        button {
+            padding: 8px 15px;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .panel {
+            border: 1px solid #ddd;
+            padding: 15px;
+            height: 600px;
+            overflow: auto;
+        }
+
+        /* DIRECTORY TREE */
+
+        .item {
+            padding: 4px 5px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .item:hover {
+            background: #f0f0f0;
+        }
+
+        .children {
+            margin-left: 15px;
+            padding-left: 15px;
+            border-left: 1px solid #ccc;
+        }
+
+        .item::before {
+            content: "";
+            position: absolute;
+            left: -15px;
+            top: 14px;
+            width: 15px;
+            border-top: 1px solid #ccc;
+        }
+
+        /* XML */
+
+        .xml-line {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            padding: 2px 5px;
+        }
+
+        .highlight {
+            background: yellow;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <h1>XMLpedia</h1>
+
+
+    <input
+        type="file"
+        id="file"
+        accept=".xml"
+    >
+
+    <button onclick="upload()">
+        Explore
+    </button>
+
+
+    <div class="layout">
+
+
+        <!-- INVOICE DATA -->
+
+        <div class="panel">
+
+            <h2>Invoice Data</h2>
+
+            <div id="tree">
+                Upload an XML file
+            </div>
+
+        </div>
+
+
+        <!-- XML -->
+
+        <div class="panel">
+
+            <h2>XML</h2>
+
+            <div id="xml"></div>
+
+        </div>
+
+
+    </div>
+
+
+    <script>
+
+        async function upload() {
+
+            const file =
+                document.getElementById("file").files[0];
+
+            if (!file) {
+
+                alert("Select an XML file");
+
+                return;
+            }
+
+            const formData =
+                new FormData();
+
+            formData.append(
+                "file",
+                file
+            );
+
+            const response =
+                await fetch(
+                    "http://127.0.0.1:8000/parse",
+                    {
+                        method: "POST",
+                        body: formData
+                    }
+                );
+
+            const data =
+                await response.json();
+
+            showXML(data.xml);
+
+            showTree(data.tree);
+        }
+
+
+        function showXML(xml) {
+
+            const box =
+                document.getElementById("xml");
+
+            box.innerHTML = "";
+
+            const lines =
+                xml.split("\n");
+
+            lines.forEach(line => {
+
+                const div =
+                    document.createElement("div");
+
+                div.className =
+                    "xml-line";
+
+                div.textContent =
+                    line;
+
+                box.appendChild(div);
+
+            });
+        }
+
+
+        function showTree(node) {
+
+            const tree =
+                document.getElementById("tree");
+
+            tree.innerHTML = "";
+
+            addNode(
+                node,
+                tree
+            );
+        }
+
+
+        function addNode(node, parent) {
+
+            const item =
+                document.createElement("div");
+
+            item.className =
+                "item";
+
+            item.innerHTML = `
+                <b>${node.tag}</b>
+                ${node.value || ""}
+            `;
+
+            item.onclick =
+                function(event) {
+
+                    event.stopPropagation();
+
+                    goToXML(node);
+
+                };
+
+
+            parent.appendChild(item);
+
+
+            if (node.children.length > 0) {
+
+                const children =
+                    document.createElement("div");
+
+                children.className =
+                    "children";
+
+                item.appendChild(children);
+
+
+                for (const child of node.children) {
+
+                    addNode(
+                        child,
+                        children
+                    );
+
+                }
+
+            }
+
+        }
+
+
+        function goToXML(node) {
+
+            const lines =
+                document.querySelectorAll(
+                    ".xml-line"
+                );
+
+
+            lines.forEach(line => {
+
+                line.classList.remove(
+                    "highlight"
+                );
+
+            });
+
+
+            const line =
+                lines[node.line - 1];
+
+
+            if (!line) {
+
+                console.log(
+                    "XML line not found:",
+                    node.line
+                );
+
+                return;
+
+            }
+
+
+            line.classList.add(
+                "highlight"
+            );
+
+
+            line.scrollIntoView({
+
+                behavior: "smooth",
+
+                block: "center"
+
+            });
+
+        }
+
+    </script>
+
+</body>
+
+</html>
